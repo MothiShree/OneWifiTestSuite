@@ -1,0 +1,13 @@
+{
+    "TestCaseID": "TC_TCPDUMP_001",
+    "TestCaseName": "Network Packet Capture Test",
+    "Description": "Captures network packets on wlan0, hwsim0, and brlan0 interfaces",
+    "Steps": [
+        {
+            "TestStepNumber": 1,
+            "Tcpdump": {
+                "Duration": 60
+            }
+        }
+    ]
+}
