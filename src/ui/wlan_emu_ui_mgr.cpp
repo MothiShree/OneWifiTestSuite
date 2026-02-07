@@ -1260,6 +1260,32 @@ int wlan_emu_ui_mgr_t::decode_step_get_file(cJSON *step, test_step_params_t *ste
     return RETURN_OK;
 }
 
+int wlan_emu_ui_mgr_t::decode_step_tcpdump(cJSON *step, test_step_params_t *step_config)
+{
+    cJSON *config;
+    cJSON *param;
+
+    step_config->param_type = step_param_type_tcpdump;
+
+    config = cJSON_GetObjectItem(step, "Tcpdump");
+
+    // Check for optional Duration parameter
+    param = cJSON_GetObjectItem(config, "Duration");
+    if (param != NULL && cJSON_IsNumber(param)) {
+        step_config->execution_time = param->valuedouble;
+    } else {
+        // Default duration is set in constructor (30 seconds)
+        wlan_emu_print(wlan_emu_log_level_dbg,
+            "%s:%d: No Duration specified, using default %d seconds\n", __func__, __LINE__,
+            step_config->execution_time);
+    }
+
+    wlan_emu_print(wlan_emu_log_level_dbg, "%s:%d: Tcpdump capture duration : %d seconds\n",
+        __func__, __LINE__, step_config->execution_time);
+
+    return RETURN_OK;
+}
+
 int wlan_emu_ui_mgr_t::decode_step_mgmt_frame_capture(cJSON *step, test_step_params_t *step_config)
 {
     cJSON *config;
@@ -2245,6 +2271,22 @@ int wlan_emu_ui_mgr_t::decode_step_param_config(cJSON *step, test_step_params_t 
         }
         if (decode_step_get_file(step, *step_config) != RETURN_OK) {
             wlan_emu_print(wlan_emu_log_level_err, "%s:%d decode_step_get_file failed\n", __func__,
+                __LINE__);
+            return RETURN_ERR;
+        }
+        return RETURN_OK;
+    }
+
+    config = cJSON_GetObjectItem(step, "Tcpdump");
+    if (config != NULL) {
+        *step_config = new (std::nothrow) test_step_param_tcpdump;
+        if ((*step_config)->is_step_initialized == false) {
+            wlan_emu_print(wlan_emu_log_level_err,
+                "%s:%d: Failed allocating memory for tcpdump step\n", __func__, __LINE__);
+            return RETURN_ERR;
+        }
+        if (decode_step_tcpdump(step, *step_config) != RETURN_OK) {
+            wlan_emu_print(wlan_emu_log_level_err, "%s:%d decode_step_tcpdump failed\n", __func__,
                 __LINE__);
             return RETURN_ERR;
         }

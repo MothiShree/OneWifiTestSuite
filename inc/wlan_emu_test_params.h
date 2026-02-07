@@ -81,6 +81,7 @@ public:
         iperf_client_t *iperf_client;
         eth_lan_interface_t *eth_lan_client;
         device_upgrade_t *upgrade_or_reboot;
+        tcpdump_t *tcpdump;
     } u;
 
     virtual int step_execute() = 0;
@@ -455,5 +456,15 @@ public:
     int factory_reset(test_step_params_t *step);
     test_step_param_upgrade_or_reboot();
     ~test_step_param_upgrade_or_reboot();
+};
+
+class test_step_param_tcpdump : public test_step_params_t {
+public:
+    int step_execute();
+    int step_timeout();
+    void step_remove();
+    int step_frame_filter(wlan_emu_msg_t *msg);
+    test_step_param_tcpdump();
+    ~test_step_param_tcpdump();
 };
 #endif

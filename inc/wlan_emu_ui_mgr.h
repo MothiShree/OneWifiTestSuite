@@ -240,6 +240,7 @@ private:
     int download_step_common_config(test_step_params_t *step);
     int cci_post_result_to_tda(unsigned int type, char *str);
     int decode_step_get_file(cJSON *step, test_step_params_t *step_config);
+    int decode_step_tcpdump(cJSON *step, test_step_params_t *step_config);
     int decode_step_mgmt_frame_capture(cJSON *step, test_step_params_t *step_config);
     int decode_step_get_pattern_files(cJSON *step, test_step_params_t *step_config);
     int decode_step_timed_wait(cJSON *step, test_step_params_t *step_config);

@@ -255,7 +255,8 @@ typedef enum {
     step_param_type_config_iperf_server,
     step_param_type_config_iperf_client,
     step_param_type_ethernet_lan_interface,
-    step_param_type_upgrade_or_reboot
+    step_param_type_upgrade_or_reboot,
+    step_param_type_tcpdump
 } step_param_type_t;
 
 typedef struct {
@@ -327,6 +328,10 @@ typedef struct {
     char dest_filename[256];
     bool delete_source_file;
 } get_file_t;
+
+typedef struct {
+    char tar_filename[256];
+} tcpdump_t;
 
 typedef enum {
     test_state_pending = 0,
