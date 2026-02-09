@@ -117,7 +117,7 @@ int test_step_param_tcpdump::step_timeout()
             if (get_current_time_string(timestamp, sizeof(timestamp)) != RETURN_OK) {
                 wlan_emu_print(wlan_emu_log_level_err, "%s:%d: get_current_time_string failed\n",
                     __func__, __LINE__);
-                step->m_ui_mgr->cci_error_code = EGENERIC;
+                step->m_ui_mgr->cci_error_code = ESYSOPS;
                 step->test_state = wlan_emu_tests_state_cmd_abort;
                 return RETURN_ERR;
             }
@@ -140,7 +140,7 @@ int test_step_param_tcpdump::step_timeout()
             if (system(tar_cmd) != 0) {
                 wlan_emu_print(wlan_emu_log_level_err, "%s:%d: Failed to create tar file\n",
                     __func__, __LINE__);
-                step->m_ui_mgr->cci_error_code = EGENERIC;
+                step->m_ui_mgr->cci_error_code = ESYSOPS;
                 step->test_state = wlan_emu_tests_state_cmd_abort;
                 return RETURN_ERR;
             }
