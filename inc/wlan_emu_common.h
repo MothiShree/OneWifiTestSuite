@@ -255,7 +255,8 @@ typedef enum {
     step_param_type_config_iperf_server,
     step_param_type_config_iperf_client,
     step_param_type_ethernet_lan_interface,
-    step_param_type_upgrade_or_reboot
+    step_param_type_upgrade_or_reboot,
+    step_param_type_tcpdump
 } step_param_type_t;
 
 typedef struct {
@@ -598,6 +599,33 @@ typedef struct {
     queue_t *logging_step_numbers; // step_number_entry_t
     bool is_fr_enabled;
 } device_upgrade_t;
+
+typedef enum {
+    tcpdump_operation_type_start = 1,
+    tcpdump_operation_type_stop,
+    tcpdump_operation_type_invalid,
+} tcpdump_operation_type_t;
+
+typedef struct {
+    char interface_name[64];
+    char cmd_options[256];
+    unsigned int duration;
+    char output_file_name[128];
+    char result_file[256];
+} tcpdump_start_conf_t;
+
+typedef struct {
+    unsigned int stop_step_number;
+} tcpdump_stop_conf_t;
+
+typedef struct {
+    tcpdump_operation_type_t input_operation;
+    std::string sta_key;
+    union {
+        tcpdump_stop_conf_t stop_conf;
+        tcpdump_start_conf_t start_conf;
+    } u;
+} tcpdump_t;
 
 #ifdef __cplusplus
 }

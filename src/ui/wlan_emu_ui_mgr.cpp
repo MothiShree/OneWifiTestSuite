@@ -1138,6 +1138,129 @@ int wlan_emu_ui_mgr_t::decode_step_configure_upgrade_or_reboot(cJSON *step,
     return RETURN_OK;
 }
 
+int wlan_emu_ui_mgr_t::decode_step_tcpdump(cJSON *step, test_step_params_t *step_config)
+{
+    cJSON *config = NULL;
+    cJSON *param = NULL;
+    tcpdump_t *tcpdump = NULL;
+
+    if (step == NULL || step_config == NULL || step_config->u.tcpdump == NULL) {
+        wlan_emu_print(wlan_emu_log_level_err,
+            "%s:%d: step or tcpdump config is NULL\n", __func__, __LINE__);
+        return RETURN_ERR;
+    }
+
+    step_config->param_type = step_param_type_tcpdump;
+    tcpdump = step_config->u.tcpdump;
+
+    config = cJSON_GetObjectItem(step, "TcpDump");
+    if (config == NULL) {
+        wlan_emu_print(wlan_emu_log_level_err,
+            "%s:%d: TcpDump object not found\n", __func__, __LINE__);
+        return RETURN_ERR;
+    }
+
+    /* StaKey – MAC address of the external agent to run tcpdump on */
+    param = cJSON_GetObjectItem(config, "StaKey");
+    if (param != NULL && cJSON_IsString(param) && param->valuestring != NULL) {
+        tcpdump->sta_key = std::string(param->valuestring);
+        wlan_emu_print(wlan_emu_log_level_dbg, "%s:%d: StaKey : %s\n", __func__, __LINE__,
+            tcpdump->sta_key.c_str());
+    } else {
+        /* StaKey is required for start; may be absent for a stop referencing another step */
+        wlan_emu_print(wlan_emu_log_level_dbg,
+            "%s:%d: StaKey not present (may be resolved from start step for stop ops)\n",
+            __func__, __LINE__);
+    }
+
+    /* Operation: "start" or "stop" */
+    param = cJSON_GetObjectItem(config, "Operation");
+    if (param != NULL && cJSON_IsString(param) && param->valuestring != NULL) {
+        if (strncmp(param->valuestring, "start", 5) == 0) {
+            tcpdump->input_operation = tcpdump_operation_type_start;
+        } else if (strncmp(param->valuestring, "stop", 4) == 0) {
+            tcpdump->input_operation = tcpdump_operation_type_stop;
+        } else {
+            wlan_emu_print(wlan_emu_log_level_err,
+                "%s:%d: Invalid Operation value: %s\n", __func__, __LINE__,
+                param->valuestring);
+            return RETURN_ERR;
+        }
+    } else {
+        wlan_emu_print(wlan_emu_log_level_err,
+            "%s:%d: Operation is missing\n", __func__, __LINE__);
+        return RETURN_ERR;
+    }
+
+    if (tcpdump->input_operation == tcpdump_operation_type_stop) {
+        /* Stop: only StopStepNumber is required */
+        param = cJSON_GetObjectItem(config, "StopStepNumber");
+        if (param != NULL && cJSON_IsNumber(param)) {
+            tcpdump->u.stop_conf.stop_step_number = (unsigned int)param->valuedouble;
+            wlan_emu_print(wlan_emu_log_level_dbg, "%s:%d: StopStepNumber : %d\n", __func__,
+                __LINE__, tcpdump->u.stop_conf.stop_step_number);
+        } else {
+            wlan_emu_print(wlan_emu_log_level_err,
+                "%s:%d: StopStepNumber missing for stop operation\n", __func__, __LINE__);
+            return RETURN_ERR;
+        }
+    } else {
+        /* Start: parse capture parameters */
+        param = cJSON_GetObjectItem(config, "Interface");
+        if (param != NULL && cJSON_IsString(param) && param->valuestring != NULL) {
+            snprintf(tcpdump->u.start_conf.interface_name,
+                sizeof(tcpdump->u.start_conf.interface_name), "%s", param->valuestring);
+            wlan_emu_print(wlan_emu_log_level_dbg, "%s:%d: Interface : %s\n", __func__, __LINE__,
+                tcpdump->u.start_conf.interface_name);
+        } else {
+            wlan_emu_print(wlan_emu_log_level_err,
+                "%s:%d: Interface is missing\n", __func__, __LINE__);
+            return RETURN_ERR;
+        }
+
+        param = cJSON_GetObjectItem(config, "Duration");
+        if (param != NULL && cJSON_IsNumber(param)) {
+            tcpdump->u.start_conf.duration = (unsigned int)param->valuedouble;
+            step_config->execution_time = (int)tcpdump->u.start_conf.duration;
+            wlan_emu_print(wlan_emu_log_level_dbg, "%s:%d: Duration : %d\n", __func__, __LINE__,
+                tcpdump->u.start_conf.duration);
+        } else {
+            wlan_emu_print(wlan_emu_log_level_err,
+                "%s:%d: Duration is missing\n", __func__, __LINE__);
+            return RETURN_ERR;
+        }
+
+        param = cJSON_GetObjectItem(config, "OutputFileName");
+        if (param != NULL && cJSON_IsString(param) && param->valuestring != NULL) {
+            snprintf(tcpdump->u.start_conf.output_file_name,
+                sizeof(tcpdump->u.start_conf.output_file_name), "%s", param->valuestring);
+            wlan_emu_print(wlan_emu_log_level_dbg, "%s:%d: OutputFileName : %s\n", __func__,
+                __LINE__, tcpdump->u.start_conf.output_file_name);
+        } else {
+            wlan_emu_print(wlan_emu_log_level_err,
+                "%s:%d: OutputFileName is missing\n", __func__, __LINE__);
+            return RETURN_ERR;
+        }
+
+        /* CmdOptions is optional – extra tcpdump flags */
+        param = cJSON_GetObjectItem(config, "CmdOptions");
+        if (param != NULL && cJSON_IsString(param) && param->valuestring != NULL) {
+            snprintf(tcpdump->u.start_conf.cmd_options,
+                sizeof(tcpdump->u.start_conf.cmd_options), "%s", param->valuestring);
+            wlan_emu_print(wlan_emu_log_level_dbg, "%s:%d: CmdOptions : %s\n", __func__, __LINE__,
+                tcpdump->u.start_conf.cmd_options);
+        } else {
+            tcpdump->u.start_conf.cmd_options[0] = '\0';
+        }
+    }
+
+    wlan_emu_print(wlan_emu_log_level_info,
+        "%s:%d: decode_step_tcpdump success for step %d operation %d\n", __func__, __LINE__,
+        step_config->step_number, tcpdump->input_operation);
+
+    return RETURN_OK;
+}
+
 int wlan_emu_ui_mgr_t::decode_step_iperf_client(cJSON *step, test_step_params_t *step_config)
 {
     cJSON *config;
@@ -2418,6 +2541,24 @@ int wlan_emu_ui_mgr_t::decode_step_param_config(cJSON *step, test_step_params_t 
         }
         return RETURN_OK;
     }
+    config = cJSON_GetObjectItem(step, "TcpDump");
+    if (config != NULL) {
+        *step_config = new (std::nothrow) test_step_param_tcpdump;
+        if ((*step_config)->is_step_initialized == false) {
+            wlan_emu_print(wlan_emu_log_level_err,
+                "%s:%d: Failed allocating memory for tcpdump step\n", __func__, __LINE__);
+            return RETURN_ERR;
+        }
+        if (decode_step_tcpdump(step, *step_config) != RETURN_OK) {
+            wlan_emu_print(wlan_emu_log_level_err, "%s:%d decode_step_tcpdump failed\n",
+                __func__, __LINE__);
+            return RETURN_ERR;
+        }
+        wlan_emu_print(wlan_emu_log_level_dbg, "%s:%d decode_step_tcpdump success\n",
+            __func__, __LINE__);
+        return RETURN_OK;
+    }
+
     wlan_emu_print(wlan_emu_log_level_err, "%s:%d Invalid step param\n\n", __func__, __LINE__);
     return RETURN_ERR;
 }
