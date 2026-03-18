@@ -467,6 +467,7 @@ public:
     int encode_external_tcpdump_start_subdoc(std::string &agent_subdoc);
     int encode_external_tcpdump_stop_subdoc(std::string &agent_subdoc);
     int push_tcpdump_result_files(const std::vector<std::string> &files);
+    int step_upload_files(FILE *output_file, bool *update_to_tda);
     test_step_param_tcpdump();
     ~test_step_param_tcpdump();
 };
