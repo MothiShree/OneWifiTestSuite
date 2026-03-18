@@ -620,6 +620,8 @@ typedef struct {
 
 typedef struct {
     tcpdump_operation_type_t input_operation;
+    unsigned int radio_index;
+    unsigned int duration;
     std::string sta_key;
     union {
         tcpdump_stop_conf_t stop_conf;
