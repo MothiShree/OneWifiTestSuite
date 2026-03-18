@@ -39,53 +39,27 @@ static int external_tcpdump_grace_timeout = 3;
 int test_step_param_tcpdump::step_execute()
 {
     test_step_params_t *step = this;
-    std::string agent_subdoc;
 
-    wlan_emu_print(wlan_emu_log_level_dbg, "%s:%d: Called for Test Step Num : %d\n", __func__,
-        __LINE__, step->step_number);
+    wlan_emu_print(wlan_emu_log_level_dbg, "%s:%d: Called for Test Step Num : %d\n",
+            __func__, __LINE__, step->step_number);
 
-    if (step->u.tcpdump->input_operation == tcpdump_operation_type_stop) {
-        wlan_emu_print(wlan_emu_log_level_dbg, "%s:%d: stop_step_number : %d\n", __func__,
-            __LINE__, step->u.tcpdump->u.stop_conf.stop_step_number);
-
-        if (encode_external_tcpdump_stop_subdoc(agent_subdoc) == RETURN_ERR) {
-            wlan_emu_print(wlan_emu_log_level_err,
-                "%s:%d: encode external tcpdump stop failed for step : %d\n", __func__, __LINE__,
-                step->step_number);
-            step->test_state = wlan_emu_tests_state_cmd_abort;
-            return RETURN_ERR;
-        }
-    } else if (step->u.tcpdump->input_operation == tcpdump_operation_type_start) {
-        wlan_emu_print(wlan_emu_log_level_dbg,
-            "%s:%d: interface : %s cmd_options : %s duration : %d output_file : %s\n",
-            __func__, __LINE__,
-            step->u.tcpdump->u.start_conf.interface_name,
-            step->u.tcpdump->u.start_conf.cmd_options,
-            step->u.tcpdump->u.start_conf.duration,
-            step->u.tcpdump->u.start_conf.output_file_name);
-
-        if (encode_external_tcpdump_start_subdoc(agent_subdoc) == RETURN_ERR) {
-            wlan_emu_print(wlan_emu_log_level_err,
-                "%s:%d: encode external tcpdump start failed for step : %d\n", __func__, __LINE__,
-                step->step_number);
-            step->test_state = wlan_emu_tests_state_cmd_abort;
-            return RETURN_ERR;
-        }
-    } else {
-        wlan_emu_print(wlan_emu_log_level_err,
-            "%s:%d: invalid tcpdump operation for step : %d\n", __func__, __LINE__,
-            step->step_number);
-        step->m_ui_mgr->cci_error_code = ESTEP;
+    // Validate capture frames flag
+    if (step->capture_frames == false) {
+        wlan_emu_print(wlan_emu_log_level_dbg, 
+                      "%s:%d: Test Step Num : %d Invalid capture frames\n",
+                      __func__, __LINE__, step->step_number);
         step->test_state = wlan_emu_tests_state_cmd_abort;
         return RETURN_ERR;
     }
 
-    if (step->fork == true) {
-        step->test_state = wlan_emu_tests_state_cmd_wait;
-    } else {
+    // Set execution time based on duration
+    if (step->u.tcpdump->duration > 0) {
+        step->execution_time = step->u.tcpdump->duration;
         step->test_state = wlan_emu_tests_state_cmd_continue;
+    } else {
+        step->test_state = wlan_emu_tests_state_cmd_results;
     }
-
+    
     return RETURN_OK;
 }
 
@@ -98,6 +72,80 @@ int test_step_param_tcpdump::step_execute()
  * @param files List of downloaded result file paths.
  * @return RETURN_OK on success, RETURN_ERR on failure.
  */
+
+int test_step_param_tcpdump::step_upload_files(FILE *output_file, bool *update_to_tda)
+{
+    test_step_params_t *step = this;
+    wlan_emu_pcap_captures *res_file = nullptr;
+    unsigned int results_count = 0;
+    char *temp_res_file = nullptr;
+    char res_file_name[128] = {0};
+    char *remote_test_results_loc = nullptr;
+
+    if (step->capture_frames == true) {
+        if (step->test_results_queue == nullptr) {
+            wlan_emu_print(wlan_emu_log_level_err, 
+                          "%s:%d: test_results_queue is null for step %d\n", 
+                          __func__, __LINE__, step->step_number);
+            return RETURN_ERR;
+        }
+        
+        results_count = queue_count(step->test_results_queue);
+        if (results_count == 0) {
+            wlan_emu_print(wlan_emu_log_level_err, 
+                          "%s:%d: No test results files to upload for step number %d\n", 
+                          __func__, __LINE__, step->step_number);
+            return RETURN_ERR;
+        }
+
+        res_file = (wlan_emu_pcap_captures *)queue_pop(step->test_results_queue);
+        remote_test_results_loc = step->m_ui_mgr->get_remote_test_results_loc();
+
+        while (res_file != nullptr) {
+            wlan_emu_print(wlan_emu_log_level_dbg, "%s:%d: File: %s\n", 
+                          __func__, __LINE__, res_file->pcap_file);
+                          
+            if (step->m_ui_mgr->upload_file_to_server(res_file->pcap_file, 
+                                                       remote_test_results_loc) != RETURN_OK) {
+                wlan_emu_print(wlan_emu_log_level_err, 
+                              "%s:%d: failed to upload %s\n", 
+                              __func__, __LINE__, res_file->pcap_file);
+                delete res_file;
+                return RETURN_ERR;
+            } else {
+                wlan_emu_print(wlan_emu_log_level_info, 
+                              "%s:%d: uploaded %s\n", 
+                              __func__, __LINE__, res_file->pcap_file);
+                              
+                *update_to_tda = true;
+                temp_res_file = strdup(res_file->pcap_file);
+                
+                if (step->m_ui_mgr->get_last_substring_after_slash(temp_res_file, 
+                                                                    res_file_name, 
+                                                                    sizeof(res_file_name)) != RETURN_OK) {
+                    wlan_emu_print(wlan_emu_log_level_err, 
+                                  "%s:%d: get_last_substring_after_slash failed for str : %s\n",
+                                  __func__, __LINE__, temp_res_file);
+                    free(temp_res_file);
+                    delete res_file;
+                    return RETURN_ERR;
+                }
+                
+                fprintf(output_file, "%s\n", res_file_name);
+                free(temp_res_file);
+            }
+            
+            delete res_file;
+            res_file = (wlan_emu_pcap_captures *)queue_pop(step->test_results_queue);
+        }
+        
+        queue_destroy(step->test_results_queue);
+        step->test_results_queue = nullptr;
+    }
+
+    return RETURN_OK;
+}
+
 int test_step_param_tcpdump::push_tcpdump_result_files(const std::vector<std::string> &files)
 {
     int ret;
@@ -144,123 +192,25 @@ int test_step_param_tcpdump::push_tcpdump_result_files(const std::vector<std::st
 int test_step_param_tcpdump::step_timeout()
 {
     test_step_params_t *step = this;
-    wlan_emu_ext_agent_interface_t *ext_agent;
-    ext_agent_status_resp_t status = {};
 
-    wlan_emu_print(wlan_emu_log_level_dbg, "%s:%d: sta_key: %s\n", __func__, __LINE__,
-        step->u.tcpdump->sta_key.c_str());
+    wlan_emu_print(wlan_emu_log_level_dbg, 
+                  "%s:%d: Test Step Num : %d timeout_count : %d\n",
+                  __func__, __LINE__, step->step_number, step->timeout_count);
 
-    ext_agent = step->m_ext_sta_mgr->get_ext_agent(
-        (char *)step->u.tcpdump->sta_key.c_str());
-    if (ext_agent == NULL) {
-        wlan_emu_print(wlan_emu_log_level_err,
-            "%s:%d: failed to find external agent for key: %s\n", __func__, __LINE__,
-            step->u.tcpdump->sta_key.c_str());
-        step->test_state = wlan_emu_tests_state_cmd_abort;
-        return RETURN_ERR;
-    }
+    if (step->test_state != wlan_emu_tests_state_cmd_results) {
+        step->timeout_count++;
 
-    if (ext_agent->get_external_agent_test_status(status, step->m_ui_mgr->cci_error_code) == RETURN_ERR) {
-        wlan_emu_print(wlan_emu_log_level_err, "%s:%d: failed to get external agent status\n",
-            __func__, __LINE__);
-        step->test_state = wlan_emu_tests_state_cmd_abort;
-        return RETURN_ERR;
-    }
-
-    wlan_emu_print(wlan_emu_log_level_dbg, "%s:%d: name: %s agent status: %s step count: %d\n",
-        __func__, __LINE__, status.agent_name.c_str(),
-        ext_agent->agent_state_as_string(status.state).c_str(), status.step_count);
-
-    for (const ext_agent_step_status_t &s : status.steps) {
-        wlan_emu_print(wlan_emu_log_level_dbg, "%s:%d: step num: %d step state: %s\n", __func__,
-            __LINE__, s.step_number, step_state_as_string(s.state).c_str());
-        for (const std::string &file : s.result_files) {
-            wlan_emu_print(wlan_emu_log_level_dbg, "%s:%d: result file: %s\n", __func__, __LINE__,
-                file.c_str());
-        }
-    }
-
-    step->timeout_count++;
-
-    if ((step->timeout_count == external_tcpdump_grace_timeout) &&
-        (status.state == ext_agent_test_state_idle)) {
-        wlan_emu_print(wlan_emu_log_level_err, "%s:%d: agent state : %s for step : %d\n", __func__,
-            __LINE__, ext_agent->agent_state_as_string(status.state).c_str(), step->step_number);
-        step->test_state = wlan_emu_tests_state_cmd_abort;
-        return RETURN_ERR;
-    }
-
-    if (status.state == ext_agent_test_state_fail) {
-        wlan_emu_print(wlan_emu_log_level_err, "%s:%d: external agent state failed for %d\n",
-            __func__, __LINE__, step->step_number);
-        step->test_state = wlan_emu_tests_state_cmd_abort;
-        return RETURN_ERR;
-    }
-
-    auto step_iter = status.steps.begin();
-    for (; step_iter != status.steps.end(); ++step_iter) {
-        wlan_emu_print(wlan_emu_log_level_dbg,
-            "%s:%d: step_iter->step_number : %d step_state : %s agent_state : %s\n", __func__,
-            __LINE__, step_iter->step_number, step_state_as_string(step_iter->state).c_str(),
-            ext_agent->agent_state_as_string(status.state).c_str());
-        if (step_iter->step_number == step_number) {
-            step->test_state = step_iter->state;
-            break;
-        }
-    }
-
-    if (step_iter == status.steps.end()) {
-        wlan_emu_print(wlan_emu_log_level_info,
-            "%s:%d: failed to get step state for number: %d agent_state : %s\n", __func__, __LINE__,
-            step_number, ext_agent->agent_state_as_string(status.state).c_str());
-        if (step->fork == true) {
-            step->test_state = wlan_emu_tests_state_cmd_wait;
-        } else {
-            step->test_state = wlan_emu_tests_state_cmd_continue;
-        }
-        return RETURN_OK;
-    }
-
-    if (step->test_state == wlan_emu_tests_state_cmd_results) {
-
-        if (step->u.tcpdump->input_operation == tcpdump_operation_type_stop) {
+        if (step->execution_time == step->timeout_count) {
+            step->test_state = wlan_emu_tests_state_cmd_results;
+            wlan_emu_print(wlan_emu_log_level_info, 
+                          "%s:%d: Test duration of %d completed for step %d\n",
+                          __func__, __LINE__, step->execution_time, step->step_number);
             return RETURN_OK;
         }
-
-        if (ext_agent->download_external_agent_result_files(step_iter->result_files,
-                step->m_ui_mgr->cci_error_code) != RETURN_OK) {
-            wlan_emu_print(wlan_emu_log_level_err, "%s:%d: failed to download test results\n",
-                __func__, __LINE__);
-            step->test_state = wlan_emu_tests_state_cmd_abort;
-            return RETURN_ERR;
-        }
-
-        if (push_tcpdump_result_files(step_iter->result_files) != RETURN_OK) {
-            wlan_emu_print(wlan_emu_log_level_err, "%s:%d: failed to push test results\n", __func__,
-                __LINE__);
-            step->test_state = wlan_emu_tests_state_cmd_abort;
-            return RETURN_ERR;
-        }
-        return RETURN_OK;
-
-    } else if (step->test_state == wlan_emu_tests_state_cmd_abort) {
-        wlan_emu_print(wlan_emu_log_level_err, "%s:%d: abort step number: %d\n", __func__, __LINE__,
-            step_number);
-        return RETURN_ERR;
-    } else {
-        wlan_emu_print(wlan_emu_log_level_info, "%s:%d: test state: %s step number: %d\n", __func__,
-            __LINE__, step_state_as_string(step->test_state).c_str(), step_number);
     }
-
-    if (step->fork == true) {
-        step->test_state = wlan_emu_tests_state_cmd_wait;
-    } else {
-        step->test_state = wlan_emu_tests_state_cmd_continue;
-    }
-
+    
     return RETURN_OK;
 }
-
 /**
  * @brief Clean up the tcpdump step resources.
  */
@@ -275,12 +225,9 @@ void test_step_param_tcpdump::step_remove()
     }
     if (step->is_step_initialized == true) {
         delete step->u.tcpdump;
-        step->u.tcpdump = nullptr;
     }
     delete step;
     step = nullptr;
-
-    return;
 }
 
 /**
@@ -289,11 +236,120 @@ void test_step_param_tcpdump::step_remove()
 int test_step_param_tcpdump::step_frame_filter(wlan_emu_msg_t *msg)
 {
     test_step_params_t *step = this;
-    wlan_emu_print(wlan_emu_log_level_dbg, "%s:%d: unhandled frame for step number : %d\n",
-        __func__, __LINE__, step->step_number);
+    wlan_emu_msg_data_t *f_data = nullptr;
+    unsigned int radio_index = 0;
+    bool is_radio_index_found = false;
+    
+    wlan_emu_print(wlan_emu_log_level_dbg, "%s:%d: step number : %d\n", 
+                   __func__, __LINE__, step->step_number);
+    
+    if (msg == nullptr) {
+        return RETURN_UNHANDLED;
+    }
+
+    // Check if capture is enabled and message type matches
+    if ((step->capture_frames != true) || 
+        (!(step->frame_request.msg_type & (1<<msg->get_msg_type())))) {
+        return RETURN_UNHANDLED;
+    }
+
+    switch (msg->get_msg_type()) {
+        case wlan_emu_msg_type_webconfig:
+            // Handle webconfig messages if needed
+            break;
+            
+        case wlan_emu_msg_type_cfg80211: // beacon/start_ap
+            f_data = msg->get_msg();
+            if (f_data->u.cfg80211.u.start_ap.phy_index == step->u.tcpdump->radio_index) {
+                wlan_emu_print(wlan_emu_log_level_dbg, 
+                              "%s:%d: Handled cfg80211 frame for radio_index: %d\n",
+                              __func__, __LINE__, step->u.tcpdump->radio_index);
+                msg->unload_cfg80211_start_ap(step);
+                return RETURN_HANDLED;
+            }
+            break;
+            
+        case wlan_emu_msg_type_frm80211: // management frames
+            if (!(step->frame_request.frm80211_ops & (1<<msg->get_frm80211_ops_type()))) {
+                return RETURN_UNHANDLED;
+            }
+
+            f_data = msg->get_msg();
+            switch (f_data->u.frm80211.ops) {
+                case wlan_emu_frm80211_ops_type_prb_req:
+                    // Probe requests - usually broadcast
+                    is_radio_index_found = true;
+                    break;
+                    
+                case wlan_emu_frm80211_ops_type_assoc_req:
+                case wlan_emu_frm80211_ops_type_reassoc_req:
+                case wlan_emu_frm80211_ops_type_action:
+                    // Check client MAC address
+                    if (step->m_ui_mgr->get_radioindex_from_bssid(
+                            f_data->u.frm80211.u.frame.client_macaddr, &radio_index) == RETURN_OK) {
+                        if (radio_index == step->u.tcpdump->radio_index) {
+                            is_radio_index_found = true;
+                        }
+                    }
+                    break;
+                    
+                case wlan_emu_frm80211_ops_type_auth:
+                case wlan_emu_frm80211_ops_type_eapol:
+                case wlan_emu_frm80211_ops_type_deauth:
+                case wlan_emu_frm80211_ops_type_disassoc:
+                    // Check both AP and client MAC addresses
+                    if (step->m_ui_mgr->get_radioindex_from_bssid(
+                            f_data->u.frm80211.u.frame.macaddr, &radio_index) == RETURN_OK) {
+                        if (radio_index == step->u.tcpdump->radio_index) {
+                            is_radio_index_found = true;
+                        }
+                    }
+                    
+                    if (is_radio_index_found == false) {
+                        if (step->m_ui_mgr->get_radioindex_from_bssid(
+                                f_data->u.frm80211.u.frame.client_macaddr, &radio_index) == RETURN_OK) {
+                            if (radio_index == step->u.tcpdump->radio_index) {
+                                is_radio_index_found = true;
+                            }
+                        }
+                    }
+                    break;
+                    
+                case wlan_emu_frm80211_ops_type_prb_resp:
+                case wlan_emu_frm80211_ops_type_assoc_resp:
+                case wlan_emu_frm80211_ops_type_reassoc_resp:
+                    // Check AP MAC address (source)
+                    if (step->m_ui_mgr->get_radioindex_from_bssid(
+                            f_data->u.frm80211.u.frame.macaddr, &radio_index) == RETURN_OK) {
+                        if (radio_index == step->u.tcpdump->radio_index) {
+                            is_radio_index_found = true;
+                        }
+                    }
+                    break;
+                    
+                default:
+                    return RETURN_UNHANDLED;
+            }
+
+            if (is_radio_index_found == true) {
+                wlan_emu_print(wlan_emu_log_level_dbg, 
+                              "%s:%d: Handled frame of type : %d for radio_index: %d\n", 
+                              __func__, __LINE__, msg->get_frm80211_ops_type(), 
+                              step->u.tcpdump->radio_index);
+                msg->unload_frm80211_msg(step);
+                return RETURN_HANDLED;
+            }
+            break;
+
+        default:
+            wlan_emu_print(wlan_emu_log_level_dbg, 
+                          "%s:%d: Not supported msg_type : %d\n", 
+                          __func__, __LINE__, msg->get_msg_type());
+            break;
+    }
+    
     return RETURN_UNHANDLED;
 }
-
 /**
  * @brief Encode and send the tcpdump start subdoc to the external agent.
  *
@@ -523,7 +579,7 @@ test_step_param_tcpdump::test_step_param_tcpdump()
         return;
     }
     memset(step->u.tcpdump, 0, sizeof(tcpdump_t));
-    step->execution_time = 30;
+    step->execution_time = 5;  // Default 5 seconds
     step->timeout_count = 0;
     step->capture_frames = false;
 }
