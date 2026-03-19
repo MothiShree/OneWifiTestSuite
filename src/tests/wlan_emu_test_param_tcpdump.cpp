@@ -39,30 +39,51 @@ static int external_tcpdump_grace_timeout = 3;
 int test_step_param_tcpdump::step_execute()
 {
     test_step_params_t *step = this;
+    std::string agent_subdoc;
 
     wlan_emu_print(wlan_emu_log_level_dbg, "%s:%d: Called for Test Step Num : %d\n",
             __func__, __LINE__, step->step_number);
 
-    // Validate capture frames flag
-    if (step->capture_frames == false) {
-        wlan_emu_print(wlan_emu_log_level_dbg, 
-                      "%s:%d: Test Step Num : %d Invalid capture frames\n",
-                      __func__, __LINE__, step->step_number);
+    // Execute based on operation type
+    if (step->u.tcpdump->input_operation == tcpdump_operation_type_start) {
+        // Start external tcpdump
+        if (encode_external_tcpdump_start_subdoc(agent_subdoc) != RETURN_OK) {
+            wlan_emu_print(wlan_emu_log_level_err,
+                "%s:%d: Failed to start tcpdump for step %d\n",
+                __func__, __LINE__, step->step_number);
+            step->test_state = wlan_emu_tests_state_cmd_abort;
+            return RETURN_ERR;
+        }
+
+        // Set execution time based on duration
+        if (step->u.tcpdump->u.start_conf.duration > 0) {
+            step->execution_time = step->u.tcpdump->u.start_conf.duration;
+            step->test_state = wlan_emu_tests_state_cmd_continue;
+        } else {
+            step->test_state = wlan_emu_tests_state_cmd_results;
+        }
+        
+    } else if (step->u.tcpdump->input_operation == tcpdump_operation_type_stop) {
+        // Stop external tcpdump
+        if (encode_external_tcpdump_stop_subdoc(agent_subdoc) != RETURN_OK) {
+            wlan_emu_print(wlan_emu_log_level_err,
+                "%s:%d: Failed to stop tcpdump for step %d\n",
+                __func__, __LINE__, step->step_number);
+            step->test_state = wlan_emu_tests_state_cmd_abort;
+            return RETURN_ERR;
+        }
+        step->test_state = wlan_emu_tests_state_cmd_results;
+        
+    } else {
+        wlan_emu_print(wlan_emu_log_level_err,
+            "%s:%d: Invalid tcpdump operation type: %d\n",
+            __func__, __LINE__, step->u.tcpdump->input_operation);
         step->test_state = wlan_emu_tests_state_cmd_abort;
         return RETURN_ERR;
     }
 
-    // Set execution time based on duration
-    if (step->u.tcpdump->duration > 0) {
-        step->execution_time = step->u.tcpdump->duration;
-        step->test_state = wlan_emu_tests_state_cmd_continue;
-    } else {
-        step->test_state = wlan_emu_tests_state_cmd_results;
-    }
-    
     return RETURN_OK;
 }
-
 /**
  * @brief Upload tcpdump result files to the test controller.
  *
