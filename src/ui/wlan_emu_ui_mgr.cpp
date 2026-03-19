@@ -1265,6 +1265,59 @@ int wlan_emu_ui_mgr_t::decode_step_tcpdump(cJSON *step, test_step_params_t *step
         } else {
             tcpdump->u.start_conf.cmd_options[0] = '\0';
         }
+
+		param = cJSON_GetObjectItem(config, "CaptureFrames");
+        if (param != NULL && cJSON_IsBool(param) && cJSON_IsTrue(param)) {
+            step_config->capture_frames = true;
+            
+            // Parse which frame types to capture
+            cJSON *frame_types = cJSON_GetObjectItem(config, "FrameTypes");
+            if (frame_types != NULL && cJSON_IsArray(frame_types)) {
+                step_config->frame_request.msg_type = 0;
+                step_config->frame_request.frm80211_ops = 0;
+                
+                for (int i = 0; i < cJSON_GetArraySize(frame_types); i++) {
+                    cJSON *frame_type = cJSON_GetArrayItem(frame_types, i);
+                    if (cJSON_IsString(frame_type)) {
+                        const char *type = frame_type->valuestring;
+                        
+                        // Parse frame types
+                        if (strcmp(type, "probe_request") == 0) {
+                            step_config->frame_request.msg_type |= (1 << wlan_emu_msg_type_frm80211);
+                            step_config->frame_request.frm80211_ops |= (1 << wlan_emu_frm80211_ops_type_prb_req);
+                        } else if (strcmp(type, "probe_response") == 0) {
+                            step_config->frame_request.msg_type |= (1 << wlan_emu_msg_type_frm80211);
+                            step_config->frame_request.frm80211_ops |= (1 << wlan_emu_frm80211_ops_type_prb_resp);
+                        } else if (strcmp(type, "auth") == 0) {
+                            step_config->frame_request.msg_type |= (1 << wlan_emu_msg_type_frm80211);
+                            step_config->frame_request.frm80211_ops |= (1 << wlan_emu_frm80211_ops_type_auth);
+                        } else if (strcmp(type, "assoc_request") == 0) {
+                            step_config->frame_request.msg_type |= (1 << wlan_emu_msg_type_frm80211);
+                            step_config->frame_request.frm80211_ops |= (1 << wlan_emu_frm80211_ops_type_assoc_req);
+                        } else if (strcmp(type, "assoc_response") == 0) {
+                            step_config->frame_request.msg_type |= (1 << wlan_emu_msg_type_frm80211);
+                            step_config->frame_request.frm80211_ops |= (1 << wlan_emu_frm80211_ops_type_assoc_resp);
+                        } else if (strcmp(type, "deauth") == 0) {
+                            step_config->frame_request.msg_type |= (1 << wlan_emu_msg_type_frm80211);
+                            step_config->frame_request.frm80211_ops |= (1 << wlan_emu_frm80211_ops_type_deauth);
+                        } else if (strcmp(type, "disassoc") == 0) {
+                            step_config->frame_request.msg_type |= (1 << wlan_emu_msg_type_frm80211);
+                            step_config->frame_request.frm80211_ops |= (1 << wlan_emu_frm80211_ops_type_disassoc);
+                        } else if (strcmp(type, "beacon") == 0) {
+                            step_config->frame_request.msg_type |= (1 << wlan_emu_msg_type_cfg80211);
+                        }
+                        // Add more frame types as needed
+                    }
+                }
+            } else {
+                // Default: capture all management frames
+                step_config->frame_request.msg_type = (1 << wlan_emu_msg_type_frm80211) | 
+                                                      (1 << wlan_emu_msg_type_cfg80211);
+                step_config->frame_request.frm80211_ops = 0xFFFF; // All frame ops
+            }
+        } else {
+            step_config->capture_frames = false;
+        }
     }
 
     wlan_emu_print(wlan_emu_log_level_info,
