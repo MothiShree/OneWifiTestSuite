@@ -1200,6 +1200,19 @@ int wlan_emu_ui_mgr_t::decode_step_tcpdump(cJSON *step, test_step_params_t *step
             wlan_emu_print(wlan_emu_log_level_dbg, "%s:%d: StopStepNumber : %d\n", __func__,
                 __LINE__, tcpdump->u.stop_conf.stop_step_number);
         } else {
+			param = cJSON_GetObjectItem(config, "RadioIndex");
+        if (param != NULL && cJSON_IsNumber(param)) {
+            tcpdump->radio_index = (unsigned int)param->valuedouble;
+            wlan_emu_print(wlan_emu_log_level_dbg, "%s:%d: RadioIndex : %d\n", 
+                          __func__, __LINE__, tcpdump->radio_index);
+        } else {
+            // RadioIndex is optional if you want to capture all radios
+            tcpdump->radio_index = 0; // or set a default
+            wlan_emu_print(wlan_emu_log_level_dbg, 
+                          "%s:%d: RadioIndex not specified, defaulting to 0\n",
+                          __func__, __LINE__);
+        }
+        param = cJSON_GetObjectItem(config, "Interface");
             wlan_emu_print(wlan_emu_log_level_err,
                 "%s:%d: StopStepNumber missing for stop operation\n", __func__, __LINE__);
             return RETURN_ERR;
