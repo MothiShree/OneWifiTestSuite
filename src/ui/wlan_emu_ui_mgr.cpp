@@ -1286,6 +1286,24 @@ int wlan_emu_ui_mgr_t::decode_step_mgmt_frame_capture(cJSON *step, test_step_par
     return RETURN_OK;
 }
 
+int wlan_emu_ui_mgr_t::decode_step_tcpdump(cJSON *step, test_step_params_t *step_config)
+{
+    cJSON *config;
+    cJSON *param;
+    char temp_result_file[128] = { 0 };
+
+    step_config->param_type = step_param_type_tcpdump;
+
+    decode_param_integer(step, "tcpdump", param);
+    decode_param_integer(step, "Duration", param);
+    step_config->u.tcpdump->duration = param->valuedouble;
+
+    wlan_emu_print(wlan_emu_log_level_dbg, "%s:%d:duration : %d\n", __func__,
+        __LINE__, step_config->u.tcpdump->duration);
+
+    return RETURN_OK;
+}
+
 int wlan_emu_ui_mgr_t::decode_stats_get_common_params(cJSON *step, test_step_params_t *step_config)
 {
     cJSON *config;
@@ -2414,6 +2432,22 @@ int wlan_emu_ui_mgr_t::decode_step_param_config(cJSON *step, test_step_params_t 
             wlan_emu_print(wlan_emu_log_level_err,
                 "%s:%d decode_step_configure_upgrade_or_reboot failed\n", __func__, __LINE__);
             step_config = NULL;
+            return RETURN_ERR;
+        }
+        return RETURN_OK;
+    }
+
+    config = cJSON_GetObjectItem(step, "Tcpdump");
+    if (config != NULL) {
+        *step_config = new (std::nothrow) test_step_param_tcpdump;
+        if ((*step_config)->is_step_initialized == false) {
+            wlan_emu_print(wlan_emu_log_level_err,
+                "%s:%d: Failed allocating memory for get file step\n", __func__, __LINE__);
+            return RETURN_ERR;
+        }
+        if (decode_step_tcpdump(step, *step_config) != RETURN_OK) {
+            wlan_emu_print(wlan_emu_log_level_err, "%s:%d decode_step_tcpdump failed\n",
+                __func__, __LINE__);
             return RETURN_ERR;
         }
         return RETURN_OK;

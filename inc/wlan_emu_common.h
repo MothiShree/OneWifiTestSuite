@@ -255,7 +255,8 @@ typedef enum {
     step_param_type_config_iperf_server,
     step_param_type_config_iperf_client,
     step_param_type_ethernet_lan_interface,
-    step_param_type_upgrade_or_reboot
+    step_param_type_upgrade_or_reboot,
+    step_param_type_tcpdump
 } step_param_type_t;
 
 typedef struct {
@@ -352,6 +353,10 @@ typedef struct {
     unsigned int radio_index;
     unsigned int duration;
 } mgmt_frame_capture_t;
+
+typedef struct {
+    unsigned int duration;
+} tcpdump_config_t;
 
 typedef enum {
     wlan_emu_mode_ht = 1,

@@ -246,6 +246,7 @@ private:
     int decode_step_config_onewifi(cJSON *step, test_step_params_t *step_config);
     int decode_step_gateway_performance(cJSON *step, test_step_params_t *step_config);
     int decode_step_configure_upgrade_or_reboot(cJSON *step, test_step_params_t *step_config);
+    int decode_step_tcpdump(cJSON *step, test_step_params_t *step_config);
 
 public:
     int init(void);
