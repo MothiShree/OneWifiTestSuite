@@ -123,6 +123,7 @@ class test_step_param_mgmt_frame_capture;
 class test_step_param_get_pattern_files;
 class test_step_param_timed_wait;
 class test_step_param_config_onewifi;
+class test_step_param_tcpdump;
 
 class wlan_emu_ui_ssl_config {
 public:
