@@ -148,9 +148,9 @@ int test_step_param_tcpdump::step_timeout()
             wlan_emu_print(wlan_emu_log_level_info,
                 "%s:%d: Test duration of %d  completed for step %d\n", __func__, __LINE__,
                 step->execution_time, step->step_number);
-            step_upload_files("/tmp/test_hwsim0");
-            step_upload_files("/tmp/test_wlan0");
-            step_upload_files("/tmp/test_brlan0");
+            m_ui_mgr->step_upload_files((char *)"/tmp/test_hwsim0");
+            m_ui_mgr->step_upload_files((char *)"/tmp/test_wlan0");
+            m_ui_mgr->step_upload_files((char *)"/tmp/test_brlan0");
             return RETURN_OK;
         }
     }
@@ -189,7 +189,12 @@ void test_step_param_tcpdump::step_remove()
     delete step;
     step = nullptr;
 
-    return;
+    return RETURN_OK;
+}
+
+int test_step_param_tcpdump::step_frame_filter(wlan_emu_msg_t *msg)
+{
+    return RETURN_OK;   // meaning: accept all / no filtering
 }
 
 test_step_param_tcpdump::test_step_param_tcpdump()

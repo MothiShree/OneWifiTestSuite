@@ -355,6 +355,7 @@ public:
     int step_execute();
     int step_timeout();
     void step_remove();
+    int step_frame_filter(wlan_emu_msg_t *msg);
     test_step_param_tcpdump();
     ~test_step_param_tcpdump();
 };
