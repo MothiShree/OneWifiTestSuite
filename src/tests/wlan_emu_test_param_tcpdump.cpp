@@ -6,7 +6,6 @@
 extern "C" {
 #include <secure_wrapper.h>
 }
-int v_secure_system(const char *command, ...);
 namespace fs = std::experimental::filesystem;
 
 int test_step_param_tcpdump::step_execute()
