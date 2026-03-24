@@ -8,6 +8,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <cjson/cJSON.h>
+#include <sys/reboot.h>
+#include <linux/reboot.h>
+#include <string>
 #include <assert.h>
 #include <experimental/filesystem>
 
