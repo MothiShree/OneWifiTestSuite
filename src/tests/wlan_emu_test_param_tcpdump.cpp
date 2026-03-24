@@ -189,7 +189,7 @@ void test_step_param_tcpdump::step_remove()
     delete step;
     step = nullptr;
 
-    return RETURN_OK;
+    return;
 }
 
 int test_step_param_tcpdump::step_frame_filter(wlan_emu_msg_t *msg)
