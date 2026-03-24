@@ -1,8 +1,17 @@
 #include "wlan_emu_log.h"
 #include "wlan_emu_test_params.h"
 #include "wlan_emu_err_code.h"
+#include "wlan_common_utils.h"
+#include "wlan_emu_common.h"
+#include "wlan_emu.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <uinstd.h>
+#include <cjson/cJSON.h>
 #include <assert.h>
 #include <experimental/filesystem>
+
 extern "C" {
 #include <secure_wrapper.h>
 }
@@ -164,7 +173,7 @@ void test_step_param_tcpdump::step_remove()
 
     ret = v_secure_system("killall tcpdump");
     if (ret != 0) {
-        wlan_emu_print(wlan_emu_log_level_warn,
+        wlan_emu_print(wlan_emu_log_level_max,
             "%s:%d: Failed to kill tcpdump processes, ret=%d (may not be running)\n", __func__,
             __LINE__, ret);
     } else {
