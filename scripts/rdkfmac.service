@@ -11,11 +11,6 @@ ExecStartPre=/bin/sh -c '\
         while ! systemctl is-active --quiet wifi.service; do \
             sleep 5; \
         done; \
-    else \
-        up=$(cut -d. -f1 /proc/uptime); \
-        if [ "$up" -lt 200 ]; then \
-            sleep $((200 - up)); \
-        fi; \
     fi'
 
 TimeoutStartSec=0
