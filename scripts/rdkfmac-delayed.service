@@ -1,0 +1,11 @@
+[Unit]
+Description=Delayed rdkfmac Driver Start
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c '\
+    up=$(cut -d. -f1 /proc/uptime); \
+    if [ "$up" -lt 200 ]; then \
+        sleep $((200 - up)); \
+    fi; \
+    exec /usr/bin/rdkfmac_modprobe.sh start'
